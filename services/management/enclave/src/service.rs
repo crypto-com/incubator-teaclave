@@ -524,13 +524,12 @@ impl TeaclaveManagement for TeaclaveManagementService {
             output_map.insert(data_name.to_string(), output_data);
         }
 
-        let staged_task = StagedTask::new(
-            task.task_id.to_owned(),
-            function,
-            arg_list,
-            input_map,
-            output_map,
-        );
+        let staged_task = StagedTask::new()
+            .task_id(task.task_id)
+            .function(&function)
+            .args(arg_list)
+            .input(input_map)
+            .output(output_map);
         self.enqueue_to_db(StagedTask::get_queue_key().as_bytes(), &staged_task)?;
         task.status = TaskStatus::Running;
         self.write_to_db(&task)
@@ -561,22 +560,10 @@ impl TeaclaveManagementService {
         input_file.uuid = Uuid::parse_str("00000000-0000-0000-0000-000000000002")?;
         self.write_to_db(&input_file)?;
 
-        let function_input = FunctionInput {
-            name: "input".to_string(),
-            description: "input_desc".to_string(),
-        };
-        let function_output = FunctionOutput {
-            name: "output".to_string(),
-            description: "output_desc".to_string(),
-        };
-        let function_input2 = FunctionInput {
-            name: "input2".to_string(),
-            description: "input_desc".to_string(),
-        };
-        let function_output2 = FunctionOutput {
-            name: "output2".to_string(),
-            description: "output_desc".to_string(),
-        };
+        let function_input = FunctionInput::new("input", "input_desc");
+        let function_output = FunctionOutput::new("output", "output_desc");
+        let function_input2 = FunctionInput::new("input2", "input_desc");
+        let function_output2 = FunctionOutput::new("output2", "output_desc");
 
         let native_function = Function {
             function_id: Uuid::parse_str("00000000-0000-0000-0000-000000000001")?,
@@ -593,10 +580,7 @@ impl TeaclaveManagementService {
 
         self.write_to_db(&native_function)?;
 
-        let function_output = FunctionOutput {
-            name: "output".to_string(),
-            description: "output_desc".to_string(),
-        };
+        let function_output = FunctionOutput::new("output", "output_desc");
         let native_function = Function {
             function_id: Uuid::parse_str("00000000-0000-0000-0000-000000000002")?,
             name: "mock-native-func".to_string(),
@@ -711,14 +695,8 @@ pub mod tests {
     }
 
     pub fn handle_function() {
-        let function_input = FunctionInput {
-            name: "input".to_string(),
-            description: "input_desc".to_string(),
-        };
-        let function_output = FunctionOutput {
-            name: "output".to_string(),
-            description: "output_desc".to_string(),
-        };
+        let function_input = FunctionInput::new("input", "input_desc");
+        let function_output = FunctionOutput::new("output", "output_desc");
         let function = Function {
             function_id: Uuid::new_v4(),
             name: "mock_function".to_string(),
@@ -800,8 +778,12 @@ pub mod tests {
         let mut output_map = HashMap::new();
         output_map.insert("output".to_string(), output_data);
 
-        let staged_task =
-            StagedTask::new(Uuid::new_v4(), function, arg_list, input_map, output_map);
+        let staged_task = StagedTask::new()
+            .task_id(Uuid::new_v4())
+            .function(&function)
+            .args(arg_list)
+            .input(input_map)
+            .output(output_map);
 
         let value = staged_task.to_vec().unwrap();
         let deserialized_data = StagedTask::from_slice(&value).unwrap();

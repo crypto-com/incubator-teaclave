@@ -1,3 +1,20 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 use crate::teaclave_common::{i32_from_task_status, i32_to_task_status};
 use crate::teaclave_frontend_service_proto as proto;
 use crate::teaclave_management_service::TeaclaveManagementRequest;
@@ -10,7 +27,8 @@ use std::collections::{HashMap, HashSet};
 use std::prelude::v1::*;
 use teaclave_rpc::into_request;
 use teaclave_types::{
-    DataOwnerList, FunctionInput, FunctionOutput, TaskStatus, TeaclaveFileCryptoInfo,
+    DataOwnerList, FunctionArguments, FunctionInput, FunctionOutput, TaskStatus,
+    TeaclaveFileCryptoInfo,
 };
 use url::Url;
 
@@ -264,7 +282,7 @@ pub struct GetFunctionResponse {
 #[derive(Debug)]
 pub struct CreateTaskRequest {
     pub function_id: String,
-    pub arg_list: HashMap<String, String>,
+    pub function_arguments: FunctionArguments,
     pub input_data_owner_list: HashMap<String, DataOwnerList>,
     pub output_data_owner_list: HashMap<String, DataOwnerList>,
 }
@@ -305,7 +323,7 @@ pub struct GetTaskResponse {
     pub creator: String,
     pub function_id: String,
     pub function_owner: String,
-    pub arg_list: HashMap<String, String>,
+    pub function_arguments: FunctionArguments,
     pub input_data_owner_list: HashMap<String, DataOwnerList>,
     pub output_data_owner_list: HashMap<String, DataOwnerList>,
     pub participants: HashSet<String>,
@@ -845,36 +863,16 @@ pub fn data_owner_list_to_proto<S: std::hash::BuildHasher>(
     ret
 }
 
-fn arg_list_from_proto(vector: Vec<proto::Argument>) -> Result<HashMap<String, String>> {
-    let mut ret = HashMap::with_capacity(vector.len());
-    for item in vector.into_iter() {
-        ret.insert(item.arg_name, item.arg_value);
-    }
-    Ok(ret)
-}
-
-fn arg_list_to_proto(map: HashMap<String, String>) -> Vec<proto::Argument> {
-    let mut ret = Vec::with_capacity(map.len());
-    for (arg_name, arg_value) in map.into_iter() {
-        let argument = proto::Argument {
-            arg_name,
-            arg_value,
-        };
-        ret.push(argument);
-    }
-    ret
-}
-
 impl std::convert::TryFrom<proto::CreateTaskRequest> for CreateTaskRequest {
     type Error = Error;
 
     fn try_from(proto: proto::CreateTaskRequest) -> Result<Self> {
-        let arg_list = arg_list_from_proto(proto.arg_list)?;
+        let function_arguments = proto.function_arguments.into();
         let input_data_owner_list = data_owner_list_from_proto(proto.input_data_owner_list)?;
         let output_data_owner_list = data_owner_list_from_proto(proto.output_data_owner_list)?;
         let ret = Self {
             function_id: proto.function_id,
-            arg_list,
+            function_arguments,
             input_data_owner_list,
             output_data_owner_list,
         };
@@ -884,13 +882,13 @@ impl std::convert::TryFrom<proto::CreateTaskRequest> for CreateTaskRequest {
 
 impl From<CreateTaskRequest> for proto::CreateTaskRequest {
     fn from(request: CreateTaskRequest) -> Self {
-        let arg_list = arg_list_to_proto(request.arg_list);
+        let function_arguments = request.function_arguments.into();
         let input_data_owner_list = data_owner_list_to_proto(request.input_data_owner_list);
         let output_data_owner_list = data_owner_list_to_proto(request.output_data_owner_list);
 
         Self {
             function_id: request.function_id,
-            arg_list,
+            function_arguments,
             input_data_owner_list,
             output_data_owner_list,
         }
@@ -958,7 +956,7 @@ impl std::convert::TryFrom<proto::GetTaskResponse> for GetTaskResponse {
     type Error = Error;
 
     fn try_from(proto: proto::GetTaskResponse) -> Result<Self> {
-        let arg_list = arg_list_from_proto(proto.arg_list)?;
+        let function_arguments = proto.function_arguments.into();
         let input_data_owner_list = data_owner_list_from_proto(proto.input_data_owner_list)?;
         let output_data_owner_list = data_owner_list_from_proto(proto.output_data_owner_list)?;
         let input_map = data_map_from_proto(proto.input_map)?;
@@ -970,7 +968,7 @@ impl std::convert::TryFrom<proto::GetTaskResponse> for GetTaskResponse {
             creator: proto.creator,
             function_id: proto.function_id,
             function_owner: proto.function_owner,
-            arg_list,
+            function_arguments,
             input_data_owner_list,
             output_data_owner_list,
             participants: proto.participants.into_iter().collect(),
@@ -986,7 +984,7 @@ impl std::convert::TryFrom<proto::GetTaskResponse> for GetTaskResponse {
 
 impl From<GetTaskResponse> for proto::GetTaskResponse {
     fn from(response: GetTaskResponse) -> Self {
-        let arg_list = arg_list_to_proto(response.arg_list);
+        let function_arguments = response.function_arguments.into();
         let input_data_owner_list = data_owner_list_to_proto(response.input_data_owner_list);
         let output_data_owner_list = data_owner_list_to_proto(response.output_data_owner_list);
         let input_map = data_map_to_proto(response.input_map);
@@ -997,7 +995,7 @@ impl From<GetTaskResponse> for proto::GetTaskResponse {
             creator: response.creator,
             function_id: response.function_id,
             function_owner: response.function_owner,
-            arg_list,
+            function_arguments,
             input_data_owner_list,
             output_data_owner_list,
             participants: response.participants.into_iter().collect(),

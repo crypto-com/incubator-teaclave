@@ -20,14 +20,15 @@ use std::collections::HashSet;
 use std::prelude::v1::*;
 use teaclave_types::Function;
 use teaclave_types::{
-    DataOwnerList, Storable, Task, TaskStatus, TeaclaveInputFile, TeaclaveOutputFile,
+    DataOwnerList, FunctionArguments, Storable, Task, TaskStatus, TeaclaveInputFile,
+    TeaclaveOutputFile,
 };
 use uuid::Uuid;
 
 pub(crate) fn create_task(
     function: Function,
     creator: String,
-    arg_list: HashMap<String, String>,
+    function_arguments: FunctionArguments,
     input_data_owner_list: HashMap<String, DataOwnerList>,
     output_data_owner_list: HashMap<String, DataOwnerList>,
 ) -> Result<Task> {
@@ -52,7 +53,7 @@ pub(crate) fn create_task(
         creator,
         function_id: function.external_id(),
         function_owner: function.owner,
-        arg_list,
+        function_arguments,
         input_data_owner_list,
         output_data_owner_list,
         participants,
@@ -64,9 +65,9 @@ pub(crate) fn create_task(
         status: TaskStatus::Created,
     };
     // check arguments
-    let function_args: HashSet<String> = function.arg_list.into_iter().collect();
-    let provide_args: HashSet<String> = task.arg_list.keys().cloned().collect();
-    let diff: HashSet<_> = function_args.difference(&provide_args).collect();
+    let function_arguments: HashSet<String> = function.arg_list.into_iter().collect();
+    let provide_args: HashSet<String> = task.function_arguments.inner().keys().cloned().collect();
+    let diff: HashSet<_> = function_arguments.difference(&provide_args).collect();
     ensure!(diff.is_empty(), "bad arguments");
 
     // check input

@@ -1,3 +1,20 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 use std::collections::HashMap;
 use std::prelude::v1::*;
 use teaclave_attestation::verifier;
@@ -220,9 +237,10 @@ fn test_get_function() {
 }
 
 fn get_correct_create_task() -> CreateTaskRequest {
-    let mut arg_list = HashMap::new();
-    arg_list.insert("arg1".to_string(), "data1".to_string());
-    arg_list.insert("arg2".to_string(), "data2".to_string());
+    let function_arguments = FunctionArguments::new(hashmap!(
+        "arg1" => "data1",
+        "arg2" => "data2",
+    ));
     let data_owner_id_list = DataOwnerList {
         user_id_list: vec!["mock_user1".to_string()].into_iter().collect(),
     };
@@ -240,7 +258,7 @@ fn get_correct_create_task() -> CreateTaskRequest {
 
     CreateTaskRequest {
         function_id: "function-00000000-0000-0000-0000-000000000001".to_string(),
-        arg_list,
+        function_arguments,
         input_data_owner_list,
         output_data_owner_list,
     }
@@ -249,7 +267,7 @@ fn get_correct_create_task() -> CreateTaskRequest {
 fn test_create_task() {
     let request = CreateTaskRequest {
         function_id: "invalid_function".to_string(),
-        arg_list: HashMap::new(),
+        function_arguments: HashMap::new().into(),
         input_data_owner_list: HashMap::new(),
         output_data_owner_list: HashMap::new(),
     };
@@ -262,7 +280,7 @@ fn test_create_task() {
     assert!(response.is_ok());
 
     let mut request = get_correct_create_task();
-    request.arg_list.remove("arg1");
+    request.function_arguments.inner_mut().remove("arg1");
     let response = client.create_task(request);
     assert!(response.is_err());
 

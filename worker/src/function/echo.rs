@@ -21,7 +21,7 @@ use std::prelude::v1::*;
 use crate::function::TeaclaveFunction;
 use crate::runtime::TeaclaveRuntime;
 use anyhow;
-use teaclave_types::TeaclaveFunctionArguments;
+use teaclave_types::FunctionArguments;
 
 #[derive(Default)]
 pub struct Echo;
@@ -30,10 +30,10 @@ impl TeaclaveFunction for Echo {
     fn execute(
         &self,
         _runtime: Box<dyn TeaclaveRuntime + Send + Sync>,
-        args: TeaclaveFunctionArguments,
+        arguments: FunctionArguments,
     ) -> anyhow::Result<String> {
-        let payload: String = args.try_get("payload")?;
-        Ok(payload)
+        let message = arguments.get("message")?.to_string();
+        Ok(message)
     }
 }
 
@@ -43,8 +43,8 @@ pub mod tests {
     use teaclave_test_utils::*;
 
     use teaclave_types::hashmap;
-    use teaclave_types::TeaclaveFunctionArguments;
-    use teaclave_types::TeaclaveWorkerFileRegistry;
+    use teaclave_types::FunctionArguments;
+    use teaclave_types::StagedFiles;
 
     use crate::function::TeaclaveFunction;
     use crate::runtime::RawIoRuntime;
@@ -54,12 +54,12 @@ pub mod tests {
     }
 
     fn test_echo() {
-        let func_args = TeaclaveFunctionArguments::new(&hashmap!(
-            "payload"  => "Hello Teaclave!"
+        let func_args = FunctionArguments::new(hashmap!(
+            "message"  => "Hello Teaclave!"
         ));
 
-        let input_files = TeaclaveWorkerFileRegistry::default();
-        let output_files = TeaclaveWorkerFileRegistry::default();
+        let input_files = StagedFiles::default();
+        let output_files = StagedFiles::default();
 
         let runtime = Box::new(RawIoRuntime::new(input_files, output_files));
         let function = Echo;

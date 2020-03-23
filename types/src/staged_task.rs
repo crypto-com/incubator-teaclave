@@ -1,35 +1,91 @@
-use crate::{Function, Storable, TeaclaveFileCryptoInfo, TeaclaveInputFile, TeaclaveOutputFile};
-use serde::{Deserialize, Serialize};
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 use std::collections::HashMap;
 use std::prelude::v1::*;
+
+use serde::{Deserialize, Serialize};
 use url::Url;
 use uuid::Uuid;
+
+use crate::{
+    ExecutorType, FunctionArguments, Storable, TeaclaveFileCryptoInfo, TeaclaveInputFile,
+    TeaclaveOutputFile,
+};
 
 const STAGED_TASK_PREFIX: &str = "staged-"; // staged-task-uuid
 pub const QUEUE_KEY: &str = "staged-task";
 
+pub type FunctionInputFiles = HashMap<String, FunctionInputFile>;
+pub type FunctionOutputFiles = HashMap<String, FunctionOutputFile>;
+
 #[derive(Debug, Deserialize, Serialize)]
-pub struct InputData {
+pub struct FunctionInputFile {
     pub url: Url,
     pub hash: String,
     pub crypto_info: TeaclaveFileCryptoInfo,
 }
 
+impl FunctionInputFile {
+    pub fn new(url: Url, hash: impl ToString, crypto_info: TeaclaveFileCryptoInfo) -> Self {
+        Self {
+            url,
+            hash: hash.to_string(),
+            crypto_info,
+        }
+    }
+
+    pub fn from_teaclave_input_file(file: &TeaclaveInputFile) -> Self {
+        Self {
+            url: file.url.to_owned(),
+            hash: file.hash.to_owned(),
+            crypto_info: file.crypto_info,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize)]
-pub struct OutputData {
+pub struct FunctionOutputFile {
     pub url: Url,
     pub crypto_info: TeaclaveFileCryptoInfo,
+}
+
+impl FunctionOutputFile {
+    pub fn new(url: Url, crypto_info: TeaclaveFileCryptoInfo) -> Self {
+        Self { url, crypto_info }
+    }
+
+    pub fn from_teaclave_output_file(file: &TeaclaveOutputFile) -> Self {
+        Self {
+            url: file.url.to_owned(),
+            crypto_info: file.crypto_info,
+        }
+    }
 }
 
 #[derive(Debug, Default, Deserialize, Serialize)]
 pub struct StagedTask {
     pub task_id: Uuid,
-    pub function_id: String,
+    pub function_id: Uuid,
     pub function_name: String,
     pub function_payload: Vec<u8>,
-    pub arg_list: HashMap<String, String>,
-    pub input_map: HashMap<String, InputData>,
-    pub output_map: HashMap<String, OutputData>,
+    pub function_arguments: FunctionArguments,
+    pub input_data: FunctionInputFiles,
+    pub output_data: FunctionOutputFiles,
 }
 
 impl Storable for StagedTask {
@@ -42,25 +98,6 @@ impl Storable for StagedTask {
     }
 }
 
-impl InputData {
-    pub fn from_input_file(file: TeaclaveInputFile) -> InputData {
-        InputData {
-            url: file.url,
-            hash: file.hash,
-            crypto_info: file.crypto_info,
-        }
-    }
-}
-
-impl OutputData {
-    pub fn from_output_file(file: TeaclaveOutputFile) -> OutputData {
-        OutputData {
-            url: file.url,
-            crypto_info: file.crypto_info,
-        }
-    }
-}
-
 impl StagedTask {
     pub fn new() -> Self {
         Self::default()
@@ -70,37 +107,54 @@ impl StagedTask {
         Self { task_id, ..self }
     }
 
-    pub fn function(self, function: &Function) -> Self {
+    pub fn function_id(self, function_id: Uuid) -> Self {
         Self {
-            function_id: function.external_id(),
-            function_name: function.name.clone(),
-            function_payload: function.payload.clone(),
+            function_id,
             ..self
         }
     }
 
-    pub fn args(self, args: HashMap<String, String>) -> Self {
+    pub fn function_name(self, function_name: impl ToString) -> Self {
         Self {
-            arg_list: args,
+            function_name: function_name.to_string(),
             ..self
         }
     }
 
-    pub fn input(self, input: HashMap<String, InputData>) -> Self {
+    pub fn function_payload(self, function_payload: Vec<u8>) -> Self {
         Self {
-            input_map: input,
+            function_payload,
             ..self
         }
     }
 
-    pub fn output(self, output: HashMap<String, OutputData>) -> Self {
+    pub fn function_arguments(self, function_arguments: FunctionArguments) -> Self {
         Self {
-            output_map: output,
+            function_arguments,
+            ..self
+        }
+    }
+
+    pub fn input_data(self, input_data: FunctionInputFiles) -> Self {
+        Self { input_data, ..self }
+    }
+
+    pub fn output_data(self, output_data: FunctionOutputFiles) -> Self {
+        Self {
+            output_data,
             ..self
         }
     }
 
     pub fn get_queue_key() -> &'static str {
         QUEUE_KEY
+    }
+
+    pub fn executor_type(&self) -> ExecutorType {
+        if self.function_payload.is_empty() {
+            ExecutorType::Native
+        } else {
+            ExecutorType::Python
+        }
     }
 }

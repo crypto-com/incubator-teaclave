@@ -15,22 +15,12 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#![cfg_attr(feature = "mesalock_sgx", no_std)]
-#[cfg(feature = "mesalock_sgx")]
-#[macro_use]
-extern crate sgx_tstd as std;
-
-use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
-
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub(crate) enum ConfigSource {
-    Path(PathBuf),
+#[macro_export]
+macro_rules! hashmap {
+    ($( $key: expr => $value: expr,)+) => { hashmap!($($key => $value),+) };
+    ($( $key: expr => $value: expr ),*) => {{
+        let mut map = ::std::collections::HashMap::new();
+        $( map.insert($key.into(), $value.into()); )*
+            map
+    }}
 }
-
-mod build;
-mod runtime;
-
-pub use build::BUILD_CONFIG;
-pub use runtime::RuntimeConfig;

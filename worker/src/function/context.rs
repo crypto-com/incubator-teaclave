@@ -1,3 +1,20 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 #[cfg(feature = "mesalock_sgx")]
 use std::prelude::v1::*;
 
@@ -224,10 +241,10 @@ pub mod tests {
     use std::str::FromStr;
     use teaclave_test_utils::*;
     use teaclave_types::hashmap;
+    use teaclave_types::StagedFiles;
+    use teaclave_types::StagedInputFile;
+    use teaclave_types::StagedOutputFile;
     use teaclave_types::TeaclaveFileRootKey128;
-    use teaclave_types::TeaclaveWorkerFileRegistry;
-    use teaclave_types::TeaclaveWorkerInputFileInfo;
-    use teaclave_types::TeaclaveWorkerOutputFileInfo;
 
     pub fn run_tests() -> bool {
         run_tests!(test_file_handle_encoding, test_rtc_api,)
@@ -246,18 +263,17 @@ pub mod tests {
         let input = PathBuf::from_str("fixtures/functions/mesapy/input.txt").unwrap();
         let output = PathBuf::from_str("fixtures/functions/mesapy/output.txt.out").unwrap();
 
-        let input_info = TeaclaveWorkerInputFileInfo::new(input, TeaclaveFileRootKey128::default());
+        let input_info = StagedInputFile::new(input, TeaclaveFileRootKey128::random());
 
-        let output_info =
-            TeaclaveWorkerOutputFileInfo::new(output, TeaclaveFileRootKey128::default());
+        let output_info = StagedOutputFile::new(output, TeaclaveFileRootKey128::random());
 
         let in_fid = "in_f1";
         let out_fid = "out_f1";
-        let input_files = TeaclaveWorkerFileRegistry {
+        let input_files = StagedFiles {
             entries: hashmap!(in_fid.to_string() => input_info),
         };
 
-        let output_files = TeaclaveWorkerFileRegistry {
+        let output_files = StagedFiles {
             entries: hashmap!(out_fid.to_string() => output_info),
         };
 

@@ -1,19 +1,30 @@
-use std::convert::TryInto;
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 use std::prelude::v1::*;
 
-use teaclave_types::hashmap;
-use teaclave_types::read_all_bytes;
-use teaclave_types::TeaclaveFileRootKey128;
-use teaclave_types::TeaclaveFunctionArguments;
-use teaclave_types::TeaclaveWorkerFileRegistry;
-use teaclave_types::TeaclaveWorkerInputFileInfo;
-use teaclave_types::TeaclaveWorkerOutputFileInfo;
-use teaclave_types::WorkerInvocation;
-
+use teaclave_types::{
+    hashmap, read_all_bytes, ExecutorType, FunctionArguments, StagedFiles, StagedFunction,
+    StagedInputFile, StagedOutputFile, TeaclaveFileRootKey128,
+};
 use teaclave_worker::Worker;
 
 fn test_start_worker() {
-    let function_args = TeaclaveFunctionArguments::new(&hashmap!(
+    let arguments = FunctionArguments::new(hashmap!(
         "feature_size"  => "4",
         "max_depth"     => "4",
         "iterations"    => "100",
@@ -29,26 +40,23 @@ fn test_start_worker() {
     let enc_output = "fixtures/functions/gbdt_training/model.enc.out";
     let expected_output = "fixtures/functions/gbdt_training/expected_model.txt";
 
-    let input_info = TeaclaveWorkerInputFileInfo::create_with_plaintext_file(plain_input).unwrap();
+    let input_info = StagedInputFile::create_with_plaintext_file(plain_input).unwrap();
 
-    let input_files = TeaclaveWorkerFileRegistry::new(hashmap!(
-        "training_data".to_string() => input_info));
+    let input_files = StagedFiles::new(hashmap!(
+        "training_data" => input_info));
 
-    let output_info =
-        TeaclaveWorkerOutputFileInfo::new(enc_output, TeaclaveFileRootKey128::default());
+    let output_info = StagedOutputFile::new(enc_output, TeaclaveFileRootKey128::random());
 
-    let output_files = TeaclaveWorkerFileRegistry::new(hashmap!(
-        "trained_model".to_string() => output_info.clone()));
+    let output_files = StagedFiles::new(hashmap!(
+        "trained_model" => output_info.clone()));
 
-    let request = WorkerInvocation {
-        runtime_name: "default".to_string(),
-        executor_type: "native".try_into().unwrap(),
-        function_name: "gbdt_training".to_string(),
-        function_payload: String::new(),
-        function_args,
-        input_files,
-        output_files,
-    };
+    let staged_function = StagedFunction::new()
+        .name("gbdt_training")
+        .arguments(arguments)
+        .input_files(input_files)
+        .output_files(output_files)
+        .runtime_name("default")
+        .executor_type(ExecutorType::Native);
 
     let worker = Worker::default();
 
@@ -56,7 +64,7 @@ fn test_start_worker() {
     assert!(capability.runtimes.contains("default"));
     assert!(capability.functions.contains("native-gbdt_training"));
 
-    let summary = worker.invoke_function(request).unwrap();
+    let summary = worker.invoke_function(staged_function).unwrap();
     assert_eq!(summary, "Trained 120 lines of data.");
 
     let result = output_info.get_plaintext().unwrap();

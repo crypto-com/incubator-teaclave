@@ -1,3 +1,20 @@
+// Licensed to the Apache Software Foundation (ASF) under one
+// or more contributor license agreements.  See the NOTICE file
+// distributed with this work for additional information
+// regarding copyright ownership.  The ASF licenses this file
+// to you under the Apache License, Version 2.0 (the
+// "License"); you may not use this file except in compliance
+// with the License.  You may obtain a copy of the License at
+//
+//   http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing,
+// software distributed under the License is distributed on an
+// "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+// KIND, either express or implied.  See the License for the
+// specific language governing permissions and limitations
+// under the License.
+
 #[cfg(feature = "mesalock_sgx")]
 use std::prelude::v1::*;
 
@@ -10,7 +27,7 @@ use std::format;
 const AES_GCM_256_KEY_LENGTH: usize = 32;
 const AES_GCM_256_IV_LENGTH: usize = 12;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AesGcm256CryptoInfo {
     pub key: [u8; AES_GCM_256_KEY_LENGTH],
     pub iv: [u8; AES_GCM_256_IV_LENGTH],
@@ -61,7 +78,7 @@ impl Default for AesGcm256CryptoInfo {
 const AES_GCM_128_KEY_LENGTH: usize = 16;
 const AES_GCM_128_IV_LENGTH: usize = 12;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct AesGcm128CryptoInfo {
     pub key: [u8; AES_GCM_128_KEY_LENGTH],
     pub iv: [u8; AES_GCM_128_IV_LENGTH],
@@ -113,12 +130,16 @@ impl Default for AesGcm128CryptoInfo {
 
 const TEACLAVE_FILE_ROOT_KEY_128_LENGTH: usize = 16;
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct TeaclaveFileRootKey128 {
     pub key: [u8; TEACLAVE_FILE_ROOT_KEY_128_LENGTH],
 }
 
 impl TeaclaveFileRootKey128 {
+    pub fn random() -> Self {
+        Self::default()
+    }
+
     pub fn new(in_key: &[u8]) -> anyhow::Result<Self> {
         anyhow::ensure!(
             in_key.len() == TEACLAVE_FILE_ROOT_KEY_128_LENGTH,
@@ -140,7 +161,7 @@ impl Default for TeaclaveFileRootKey128 {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub enum TeaclaveFileCryptoInfo {
     AesGcm128(AesGcm128CryptoInfo),
     AesGcm256(AesGcm256CryptoInfo),
@@ -198,7 +219,7 @@ impl TeaclaveFileCryptoInfo {
 
 impl Default for TeaclaveFileCryptoInfo {
     fn default() -> Self {
-        TeaclaveFileCryptoInfo::TeaclaveFileRootKey128(TeaclaveFileRootKey128::default())
+        TeaclaveFileCryptoInfo::TeaclaveFileRootKey128(TeaclaveFileRootKey128::random())
     }
 }
 

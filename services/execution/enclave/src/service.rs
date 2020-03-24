@@ -15,12 +15,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-#[cfg(feature = "mesalock_sgx")]
-use std::prelude::v1::*;
-
 use crate::ocall::handle_file_request;
 
 use std::collections::HashMap;
+use std::prelude::v1::*;
 use std::sync::{Arc, SgxMutex as Mutex};
 
 use teaclave_proto::teaclave_scheduler_service::*;
@@ -29,6 +27,7 @@ use teaclave_types::{ExecutionResult, StagedFunction, StagedTask, TaskStatus};
 use teaclave_worker::Worker;
 
 use anyhow::Result;
+use log::debug;
 use uuid::Uuid;
 
 #[derive(Clone)]
@@ -79,9 +78,12 @@ impl TeaclaveExecutionService {
                     continue;
                 }
             };
+            drop(client); // drop mutex guard
+
             log::debug!("response: {:?}", response);
             let staged_task = response.staged_task;
             let result = self.invoke_task(&staged_task).unwrap();
+            debug!("result: {:?}", result);
             match self.update_task_status(&staged_task.task_id, TaskStatus::Finished) {
                 Ok(_) => (),
                 Err(e) => {
@@ -100,10 +102,12 @@ impl TeaclaveExecutionService {
     }
 
     fn invoke_task(&mut self, task: &StagedTask) -> Result<ExecutionResult> {
+        debug!("invoke_task");
         self.update_task_status(&task.task_id, TaskStatus::Running)?;
         let invocation = prepare_task(&task);
         let worker = Worker::default();
         let summary = worker.invoke_function(invocation)?;
+        debug!("summary: {:?}", summary);
         finalize_task(&task)?;
         let mut result = ExecutionResult::default();
         result.return_value = summary.as_bytes().to_vec();
@@ -112,6 +116,7 @@ impl TeaclaveExecutionService {
     }
 
     fn update_task_result(&mut self, task_id: &Uuid, result: ExecutionResult) -> Result<()> {
+        debug!("update_task_result");
         let request = UpdateTaskResultRequest::new(
             task_id.to_owned(),
             &result.return_value,
@@ -128,6 +133,7 @@ impl TeaclaveExecutionService {
     }
 
     fn update_task_status(&mut self, task_id: &Uuid, task_status: TaskStatus) -> Result<()> {
+        debug!("update_task_status");
         let request = UpdateTaskStatusRequest::new(task_id.to_owned(), task_status);
         let _response = self
             .scheduler_client
@@ -229,7 +235,6 @@ fn prepare_task(task: &StagedTask) -> StagedFunction {
 #[cfg(feature = "enclave_unit_test")]
 pub mod tests {
     use super::*;
-    use std::collections::HashMap;
     use std::format;
     use teaclave_types::*;
     use url::Url;
@@ -237,16 +242,13 @@ pub mod tests {
 
     pub fn test_invoke_echo() {
         let task_id = Uuid::new_v4();
-        let mut arg_map = HashMap::new();
-        arg_map.insert("message".to_string(), "Hello, Teaclave!".to_string());
-        let input_map = HashMap::new();
-        let output_map = HashMap::new();
+        let function_arguments = FunctionArguments::new(hashmap!(
+            "message" => "Hello, Teaclave!"
+        ));
         let staged_task = StagedTask::new()
             .task_id(task_id)
             .function_name("echo")
-            .function_arguments(arg_map.into())
-            .input_data(input_map)
-            .output_data(output_map);
+            .function_arguments(function_arguments);
 
         let invocation = prepare_task(&staged_task);
 

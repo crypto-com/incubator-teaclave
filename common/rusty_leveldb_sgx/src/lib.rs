@@ -28,27 +28,15 @@
 #[macro_use]
 extern crate sgx_tstd as std;
 
-#[macro_use]
-extern crate cfg_if;
-cfg_if! {
-    if #[cfg(feature = "mesalock_sgx")]  {
-        extern crate sgx_libc as libc;
-        extern crate sgx_trts;
-        extern crate sgx_types;
-        extern crate protected_fs;
-    } else {
-        extern crate libc;
-    }
-}
+extern crate protected_fs;
+extern crate sgx_libc as libc;
+extern crate sgx_trts;
+extern crate sgx_types;
 
 extern crate crc;
 extern crate integer_encoding;
 extern crate rand;
 extern crate snap;
-
-#[cfg(test)]
-#[macro_use]
-extern crate time_test;
 
 mod block;
 mod block_builder;
@@ -97,3 +85,41 @@ pub use crate::types::LdbIterator;
 pub use crate::write_batch::WriteBatch;
 pub use db_impl::DB;
 pub use disk_env::PosixDiskEnv;
+
+#[cfg(feature = "enclave_unit_test")]
+pub mod tests {
+    use super::*;
+    use std::prelude::v1::*;
+    use teaclave_test_utils::check_all_passed;
+
+    pub fn run_tests() -> bool {
+        check_all_passed!(
+            block::tests::run_tests(),
+            block_builder::tests::run_tests(),
+            blockhandle::tests::run_tests(),
+            cache::tests::run_tests(),
+            cmp::tests::run_tests(),
+            db_impl::tests::run_tests(),
+            db_iter::tests::run_tests(),
+            disk_env::tests::run_tests(),
+            filter::tests::run_tests(),
+            filter_block::tests::run_tests(),
+            key_types::tests::run_tests(),
+            log::tests::run_tests(),
+            mem_env::tests::run_tests(),
+            memtable::tests::run_tests(),
+            merging_iter::tests::run_tests(),
+            skipmap::tests::run_tests(),
+            snapshot::tests::run_tests(),
+            table_builder::tests::run_tests(),
+            table_cache::tests::run_tests(),
+            test_util::tests::run_tests(),
+            table_reader::tests::run_tests(),
+            types::tests::run_tests(),
+            version::tests::run_tests(),
+            version_edit::tests::run_tests(),
+            version_set::tests::run_tests(),
+            write_batch::tests::run_tests(),
+        )
+    }
+}

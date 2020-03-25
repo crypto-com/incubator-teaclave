@@ -256,19 +256,16 @@ impl TeaclaveManagement for TeaclaveManagementService {
             .to_string();
 
         let request = request.message;
-        let function_id = Uuid::new_v4();
-        let function = Function {
-            function_id,
-            name: request.name,
-            description: request.description,
-            payload: request.payload,
-            is_public: request.is_public,
-            arg_list: request.arg_list,
-            input_list: request.input_list,
-            output_list: request.output_list,
-            owner: user_id,
-            is_native: false,
-        };
+        let function = Function::new()
+            .id(Uuid::new_v4())
+            .name(request.name)
+            .description(request.description)
+            .payload(request.payload)
+            .public(request.is_public)
+            .arguments(request.arg_list)
+            .inputs(request.input_list)
+            .outputs(request.output_list)
+            .owner(user_id);
 
         self.write_to_db(&function)
             .map_err(|_| TeaclaveManagementError::StorageError)?;
@@ -278,7 +275,7 @@ impl TeaclaveManagement for TeaclaveManagementService {
         Ok(response)
     }
 
-    // access control: function.is_public || function.owner == user_id
+    // access control: function.public || function.owner == user_id
     fn get_function(
         &self,
         request: Request<GetFunctionRequest>,
@@ -295,7 +292,7 @@ impl TeaclaveManagement for TeaclaveManagementService {
         let function: Function = self
             .read_from_db(request.message.function_id.as_bytes())
             .map_err(|_| TeaclaveManagementError::PermissionDenied)?;
-        if !(function.is_public || function.owner == user_id) {
+        if !(function.public || function.owner == user_id) {
             return Err(TeaclaveManagementError::PermissionDenied.into());
         }
         let response = GetFunctionResponse {
@@ -303,10 +300,10 @@ impl TeaclaveManagement for TeaclaveManagementService {
             description: function.description,
             owner: function.owner,
             payload: function.payload,
-            is_public: function.is_public,
-            arg_list: function.arg_list,
-            input_list: function.input_list,
-            output_list: function.output_list,
+            is_public: function.public,
+            arg_list: function.arguments,
+            input_list: function.inputs,
+            output_list: function.outputs,
         };
         Ok(response)
     }
@@ -543,7 +540,7 @@ impl TeaclaveManagement for TeaclaveManagementService {
 
         let staged_task = StagedTask::new()
             .task_id(task.task_id)
-            .function_id(function.function_id)
+            .function_id(function.id)
             .function_name(&function.name)
             .function_payload(function.payload)
             .function_arguments(function_arguments)
@@ -584,35 +581,31 @@ impl TeaclaveManagementService {
         let function_input2 = FunctionInput::new("input2", "input_desc");
         let function_output2 = FunctionOutput::new("output2", "output_desc");
 
-        let native_function = Function {
-            function_id: Uuid::parse_str("00000000-0000-0000-0000-000000000001")?,
-            name: "mock-native-func".to_string(),
-            description: "mock-desc".to_string(),
-            payload: b"mock-payload".to_vec(),
-            is_public: true,
-            arg_list: vec!["arg1".to_string(), "arg2".to_string()],
-            input_list: vec![function_input, function_input2],
-            output_list: vec![function_output, function_output2],
-            owner: "teaclave".to_string(),
-            is_native: true,
-        };
+        let function = Function::new()
+            .id(Uuid::parse_str("00000000-0000-0000-0000-000000000001").unwrap())
+            .name("mock-func-1")
+            .description("mock-desc")
+            .payload(b"mock-payload".to_vec())
+            .public(true)
+            .arguments(vec!["arg1".to_string(), "arg2".to_string()])
+            .inputs(vec![function_input, function_input2])
+            .outputs(vec![function_output, function_output2])
+            .owner("teaclave".to_string());
 
-        self.write_to_db(&native_function)?;
+        self.write_to_db(&function)?;
 
         let function_output = FunctionOutput::new("output", "output_desc");
-        let native_function = Function {
-            function_id: Uuid::parse_str("00000000-0000-0000-0000-000000000002")?,
-            name: "mock-native-func".to_string(),
-            description: "mock-desc".to_string(),
-            payload: b"mock-payload".to_vec(),
-            is_public: true,
-            arg_list: vec!["arg1".to_string()],
-            input_list: vec![],
-            output_list: vec![function_output],
-            owner: "teaclave".to_string(),
-            is_native: true,
-        };
-        self.write_to_db(&native_function)?;
+        let function = Function::new()
+            .id(Uuid::parse_str("00000000-0000-0000-0000-000000000002").unwrap())
+            .name("mock-func-2")
+            .description("mock-desc")
+            .payload(b"mock-payload".to_vec())
+            .public(true)
+            .arguments(vec!["arg1".to_string()])
+            .outputs(vec![function_output])
+            .owner("teaclave".to_string());
+
+        self.write_to_db(&function)?;
         Ok(())
     }
 
@@ -680,8 +673,7 @@ pub mod tests {
     use super::*;
     use std::collections::{HashMap, HashSet};
     use teaclave_types::{
-        hashmap, FunctionArguments, FunctionInput, FunctionOutput, TeaclaveFileCryptoInfo,
-        TeaclaveFileRootKey128,
+        hashmap, FileCrypto, FunctionArguments, FunctionInput, FunctionOutput, TeaclaveFile128Key,
     };
     use url::Url;
 
@@ -690,9 +682,7 @@ pub mod tests {
         let hash = "a6d604b5987b693a19d94704532b5d928c2729f24dfd40745f8d03ac9ac75a8b".to_string();
         let mut user_id: HashSet<String> = HashSet::new();
         user_id.insert("mock_user".to_string());
-        let crypto_info = TeaclaveFileCryptoInfo::TeaclaveFileRootKey128(
-            TeaclaveFileRootKey128::new(&[0; 16]).unwrap(),
-        );
+        let crypto_info = FileCrypto::TeaclaveFile128(TeaclaveFile128Key::new(&[0; 16]).unwrap());
         let input_file = TeaclaveInputFile::new(url, hash, crypto_info, user_id);
         assert!(TeaclaveInputFile::match_prefix(&input_file.key_string()));
         let value = input_file.to_vec().unwrap();
@@ -704,9 +694,7 @@ pub mod tests {
         let url = Url::parse("s3://bucket_id/path?token=mock_token").unwrap();
         let mut user_id: HashSet<String> = HashSet::new();
         user_id.insert("mock_user".to_string());
-        let crypto_info = TeaclaveFileCryptoInfo::TeaclaveFileRootKey128(
-            TeaclaveFileRootKey128::new(&[0; 16]).unwrap(),
-        );
+        let crypto_info = FileCrypto::TeaclaveFile128(TeaclaveFile128Key::new(&[0; 16]).unwrap());
         let output_file = TeaclaveOutputFile::new(url, crypto_info, user_id);
         assert!(TeaclaveOutputFile::match_prefix(&output_file.key_string()));
         let value = output_file.to_vec().unwrap();
@@ -717,18 +705,16 @@ pub mod tests {
     pub fn handle_function() {
         let function_input = FunctionInput::new("input", "input_desc");
         let function_output = FunctionOutput::new("output", "output_desc");
-        let function = Function {
-            function_id: Uuid::new_v4(),
-            name: "mock_function".to_string(),
-            description: "mock function".to_string(),
-            payload: b"python script".to_vec(),
-            is_public: true,
-            arg_list: vec!["arg".to_string()],
-            input_list: vec![function_input],
-            output_list: vec![function_output],
-            owner: "mock_user".to_string(),
-            is_native: false,
-        };
+        let function = Function::new()
+            .id(Uuid::new_v4())
+            .name("mock_function")
+            .description("mock function")
+            .payload(b"python script".to_vec())
+            .arguments(vec!["arg".to_string()])
+            .inputs(vec![function_input])
+            .outputs(vec![function_output])
+            .public(true)
+            .owner("mock_user");
         assert!(Function::match_prefix(&function.key_string()));
         let value = function.to_vec().unwrap();
         let deserialized_function = Function::from_slice(&value).unwrap();
@@ -736,18 +722,14 @@ pub mod tests {
     }
 
     pub fn handle_task() {
-        let function = Function {
-            function_id: Uuid::new_v4(),
-            name: "mock_function".to_string(),
-            description: "mock function".to_string(),
-            payload: b"python script".to_vec(),
-            is_public: true,
-            arg_list: vec!["arg".to_string()],
-            input_list: vec![],
-            output_list: vec![],
-            owner: "mock_user".to_string(),
-            is_native: false,
-        };
+        let function = Function::new()
+            .id(Uuid::new_v4())
+            .name("mock_function")
+            .description("mock function")
+            .payload(b"python script".to_vec())
+            .arguments(vec!["arg".to_string()])
+            .public(true)
+            .owner("mock_user");
         let function_arguments = FunctionArguments::new(hashmap!("arg" => "data"));
 
         let task = crate::task::create_task(
@@ -766,27 +748,20 @@ pub mod tests {
     }
 
     pub fn handle_staged_task() {
-        let function = Function {
-            function_id: Uuid::new_v4(),
-            name: "mock".to_string(),
-            description: "".to_string(),
-            payload: b"python script".to_vec(),
-            is_public: false,
-            arg_list: vec![],
-            input_list: vec![],
-            output_list: vec![],
-            owner: "mock_user".to_string(),
-            is_native: true,
-        };
+        let function = Function::new()
+            .id(Uuid::new_v4())
+            .name("mock_function")
+            .description("mock function")
+            .payload(b"python script".to_vec())
+            .public(true)
+            .owner("mock_user");
         let mut arg_list = HashMap::new();
         arg_list.insert("arg".to_string(), "data".to_string());
         let function_arguments = arg_list.into();
 
         let url = Url::parse("s3://bucket_id/path?token=mock_token").unwrap();
         let hash = "a6d604b5987b693a19d94704532b5d928c2729f24dfd40745f8d03ac9ac75a8b".to_string();
-        let crypto_info = TeaclaveFileCryptoInfo::TeaclaveFileRootKey128(
-            TeaclaveFileRootKey128::new(&[0; 16]).unwrap(),
-        );
+        let crypto_info = FileCrypto::TeaclaveFile128(TeaclaveFile128Key::new(&[0; 16]).unwrap());
         let input_data = FunctionInputFile::new(url.clone(), hash, crypto_info);
         let output_data = FunctionOutputFile::new(url, crypto_info);
         let mut input_map = HashMap::new();
@@ -796,7 +771,7 @@ pub mod tests {
 
         let staged_task = StagedTask::new()
             .task_id(Uuid::new_v4())
-            .function_id(function.function_id)
+            .function_id(function.id)
             .function_name(&function.name)
             .function_payload(function.payload)
             .function_arguments(function_arguments)

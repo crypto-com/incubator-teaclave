@@ -66,12 +66,12 @@ impl TeaclaveSchedulerService {
             match storage_service_endpoint.connect() {
                 Ok(channel) => break channel,
                 Err(_) => {
-                    anyhow::ensure!(i < 3, "failed to connect to storage service");
+                    anyhow::ensure!(i < 10, "failed to connect to storage service");
                     log::debug!("Failed to connect to storage service, retry {}", i);
                     i += 1;
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            std::thread::sleep(std::time::Duration::from_secs(3));
         };
         let storage_client = Arc::new(Mutex::new(TeaclaveStorageClient::new(channel)?));
         let task_queue = Arc::new(Mutex::new(VecDeque::new()));
@@ -163,6 +163,7 @@ impl TeaclaveScheduler for TeaclaveSchedulerService {
         let request = request.message;
         let mut task = self.get_task(&request.task_id.to_string())?;
         task.status = request.task_status;
+        log::info!("UpdateTaskStatus: Task {:?}", task);
         self.put_task(&task)?;
         Ok(UpdateTaskStatusResponse {})
     }

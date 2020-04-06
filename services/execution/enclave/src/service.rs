@@ -42,12 +42,12 @@ impl TeaclaveExecutionService {
             match scheduler_service_endpoint.connect() {
                 Ok(channel) => break channel,
                 Err(_) => {
-                    anyhow::ensure!(i < 3, "failed to connect to storage service");
-                    log::debug!("Failed to connect to storage service, retry {}", i);
+                    anyhow::ensure!(i < 10, "failed to connect to scheduler service");
+                    log::debug!("Failed to connect to scheduler service, retry {}", i);
                     i += 1;
                 }
             }
-            std::thread::sleep(std::time::Duration::from_secs(1));
+            std::thread::sleep(std::time::Duration::from_secs(3));
         };
         let scheduler_client = Arc::new(Mutex::new(TeaclaveSchedulerClient::new(channel)?));
         Ok(TeaclaveExecutionService {
@@ -67,6 +67,7 @@ impl TeaclaveExecutionService {
                 }
             };
 
+            log::info!("InvokeTask: {:?}", staged_task);
             let result = match self.invoke_task(&staged_task) {
                 Ok(exec_result) => exec_result,
                 Err(e) => {
@@ -118,7 +119,6 @@ impl TeaclaveExecutionService {
     }
 
     fn invoke_task(&mut self, task: &StagedTask) -> Result<ExecutionResult> {
-        log::debug!("invoke_task");
         self.update_task_status(&task.task_id, TaskStatus::Running, String::new())?;
         let invocation = prepare_task(&task);
         let worker = Worker::default();
